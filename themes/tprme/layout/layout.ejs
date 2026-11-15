@@ -11,7 +11,7 @@
     if (is_tag()) heading = '标签：' + page.tag;
     const title = is_home() ? config.title + ' · ' + config.subtitle : heading + ' | ' + config.title;
     const description = page.secret ? '这是一篇加密文章。' : strip_html(page.description || page.excerpt || config.description).replace(/\s+/g, ' ').slice(0, 180);
-    const shareImage = page.cover || '/images/share-actear.webp';
+    const shareImage = page.cover || asset_url('/images/share-actear.webp');
 %>
 <!doctype html>
 <html lang="<%= config.language %>">

@@ -1,3 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <path id="actear-glyph" fill="currentColor" fill-rule="evenodd" d="M48 20C30.3 20 16 34.3 16 52s14.3 32 32 32c9.3 0 17.7-4 23.5-10.4L79 84h12L78 65.4V20H64v4.3C59.3 21.5 53.8 20 48 20Zm0 14c-4.8 6.2-14 12.8-14 21a14 14 0 0 0 28 0c0-8.2-9.2-14.8-14-21Z"/>
+  <title>actear — 字母 a 与含泪的侧脸</title>
+  <path id="actear-glyph" fill="currentColor" fill-rule="evenodd" transform="translate(-1.5 -6)" d="M46 22C27 22 12 37 12 56s15 34 34 34c10 0 19-4 25-11 4 6 10 9 20 9V74c-8 0-12-5-12-12V22H65v6c-5-4-12-6-19-6ZM49 31C36 36 26 48 26 61c0 12 9 20 21 20 9 0 15-5 15-11 0-3-2-5-4-6 4-1 7-3 6-5l-3-3 10-3-10-11c-2-5-7-9-12-11ZM46 47c-2 4-5 7-5 10a5 5 0 0 0 10 0c0-3-3-6-5-10Z"/>
 </svg>
