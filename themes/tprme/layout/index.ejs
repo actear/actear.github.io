@@ -1,14 +1,14 @@
 <% const firstPage = !page.current || page.current === 1; %>
 <div class="shell">
     <% if (firstPage) { %>
-    <section class="hero" aria-labelledby="hero-title">
+    <section class="hero" data-enter aria-labelledby="hero-title">
         <div class="hero-copy">
-            <h1 id="hero-title"><%= config.title %><span class="title-dot">.</span></h1>
+            <h1 id="hero-title"><span class="hero-title-text"><%= config.title %><span class="title-dot">.</span></span></h1>
             <p class="hero-subtitle"><%= config.subtitle %></p>
             <div class="hero-actions"><a class="button button-primary" href="#latest">读最近的文章 <span aria-hidden="true">↓</span></a><a class="button button-secondary" href="<%- url_for('/about/') %>">关于我 <span aria-hidden="true">↗</span></a></div>
         </div>
         <figure class="hero-figure">
-            <button type="button" class="hero-photo" data-photo="<%- url_for(theme.hero) %>" aria-label="放大首页照片"><img src="<%- url_for(theme.hero) %>" alt="路牌旁的摩托车合影" width="509" height="660" fetchpriority="high"><span class="photo-expand" aria-hidden="true">↗</span></button>
+            <button type="button" class="hero-photo" data-photo="<%- url_for(theme.hero) %>" aria-label="放大首页照片"><img data-enter-media src="<%- url_for(theme.hero) %>" alt="路牌旁的摩托车合影" width="509" height="660" fetchpriority="high"><span class="photo-expand" aria-hidden="true">↗</span></button>
         </figure>
     </section>
     <% } %>

@@ -54,6 +54,8 @@
         <img id="photo-full" alt="">
     </dialog>
     <script src="<%- asset_url('/js/site.js') %>" defer></script>
+    <script src="<%- asset_url('/js/vendor/gsap.min.js') %>" defer></script>
     <script src="<%- asset_url('/js/nav-preview.js') %>" defer></script>
+    <% if (view === 'index' && (!page.current || page.current === 1)) { %><script src="<%- asset_url('/js/hero-motion.js') %>" defer></script><% } %>
 </body>
 </html>

@@ -1,54 +1,94 @@
-/* Shared, morphing navigation panel. No animation library or remote assets. */
 (function () {
     'use strict';
+    var header = document.getElementById('menu');
     var nav = document.getElementById('desktop-menu');
     var viewport = document.getElementById('nav-preview');
-    if (!nav || !viewport) return;
+    if (!header || !nav || !viewport) return;
 
+    var frame = viewport.querySelector('.nav-preview-frame');
+    var gsap = window.gsap;
     var desktop = window.matchMedia('(min-width: 900px)');
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     var triggers = Array.from(nav.querySelectorAll('[data-nav-preview]'));
     var navLinks = Array.from(nav.querySelectorAll('a'));
-    var panels = Array.from(viewport.querySelectorAll('[data-nav-panel]'));
+    var panels = Array.from(frame.querySelectorAll('[data-nav-panel]'));
     var active = null;
     var current = null;
+    var timeline;
     var closeTimer;
-    var lastIndex = 0;
     var restoringFocus = false;
 
-    function cancelClose() { clearTimeout(closeTimer); }
-    function position() {
-        if (!active || !current) return;
-        var rect = active.getBoundingClientRect();
-        var navRect = document.getElementById('menu').getBoundingClientRect();
-        var width = Math.min(Number(current.dataset.width), window.innerWidth - 32);
-        current.style.width = (width - 2) + 'px';
-        var x = Math.max(16, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - 16));
-        viewport.style.width = width + 'px';
-        viewport.style.height = (current.offsetHeight + 2) + 'px';
-        viewport.style.left = x + 'px';
-        var below = navRect.top < window.innerHeight / 2;
-        viewport.dataset.side = below ? 'bottom' : 'top';
-        viewport.style.top = below ? (navRect.bottom + 10) + 'px' : 'auto';
-        viewport.style.bottom = below ? 'auto' : (window.innerHeight - navRect.top + 12) + 'px';
-    }
+    panels.forEach(function (panel) { panel.style.setProperty('--panel-width', panel.dataset.width + 'px'); });
 
-    function close(restore) {
+    function cancelClose() { clearTimeout(closeTimer); }
+    function stopMotion() {
+        if (timeline) timeline.kill();
+        timeline = null;
+    }
+    function canAnimate() { return gsap && !reduced.matches; }
+    function clearMotion(element) {
+        if (gsap && (element.style.transform || element.style.opacity)) {
+            gsap.set(element, { clearProps: 'transform,opacity' });
+        }
+    }
+    function hide(panel) { panel.hidden = true; clearMotion(panel); }
+    function resetFrame() {
+        viewport.hidden = true;
+        clearMotion(frame);
+        panels.forEach(hide);
+    }
+    function measure(trigger, panel) {
+        var rect = trigger.getBoundingClientRect();
+        var top = Math.ceil(header.getBoundingClientRect().bottom + 8);
+        var room = Math.max(1, window.innerHeight - top - 12);
+        var width = Number(panel.dataset.width);
+        viewport.style.top = top + 'px';
+        viewport.style.height = room + 'px';
+        viewport.hidden = false;
+        var height = Math.min(room, panel.offsetHeight + 2);
+        return {
+            x: Math.max(16, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - 16)),
+            right: (viewport.offsetWidth - width) + 'px',
+            bottom: (room - height) + 'px'
+        };
+    }
+    function settle(geometry) {
+        if (gsap) gsap.set(viewport, { x: geometry.x });
+        else viewport.style.transform = 'translateX(' + geometry.x + 'px)';
+        frame.style.setProperty('--preview-right', geometry.right);
+        frame.style.setProperty('--preview-bottom', geometry.bottom);
+        clearMotion(frame);
+        clearMotion(current);
+        panels.filter(function (panel) { return panel !== current; }).forEach(hide);
+    }
+    function refresh() {
+        stopMotion();
+        if (current) settle(measure(active, current));
+        else resetFrame();
+    }
+    function close(restore, immediate) {
         cancelClose();
+        if (!active) {
+            if (immediate) refresh();
+            return;
+        }
         var previous = active;
-        triggers.forEach(function (trigger) { trigger.setAttribute('aria-expanded', 'false'); });
-        active = null;
-        current = null;
+        stopMotion();
+        active = current = null;
+        previous.setAttribute('aria-expanded', 'false');
         viewport.classList.remove('is-open');
         viewport.inert = true;
         panels.forEach(function (panel) { panel.inert = true; });
-        if (restore && previous) {
+        if (restore) {
             restoringFocus = true;
             previous.focus();
             restoringFocus = false;
         }
+        if (canAnimate() && !immediate) {
+            timeline = gsap.timeline({ onComplete: resetFrame });
+            timeline.to(frame, { y: -4, opacity: 0, duration: .12, ease: 'power1.in' });
+        } else resetFrame();
     }
-
     function scheduleClose() {
         cancelClose();
         closeTimer = setTimeout(function () {
@@ -62,31 +102,47 @@
         if (active === trigger) return;
         var next = panels.find(function (panel) { return panel.dataset.navPanel === trigger.dataset.navPreview; });
         if (!next) return;
-        var wasOpen = !!active;
-        var index = triggers.indexOf(trigger);
-        var direction = index >= lastIndex ? 1 : -1;
-        lastIndex = index;
-        triggers.forEach(function (item) { item.setAttribute('aria-expanded', String(item === trigger)); });
-        panels.forEach(function (panel) {
-            panel.getAnimations().forEach(function (animation) { animation.cancel(); });
-            panel.hidden = panel !== next;
-            panel.inert = panel !== next;
-        });
+        var outgoing = current;
+        var returning = !!outgoing && !next.hidden;
+        var direction = triggers.indexOf(trigger) > triggers.indexOf(active) ? 1 : -1;
+        if (active) active.setAttribute('aria-expanded', 'false');
+        stopMotion();
+
         active = trigger;
         current = next;
+        panels.forEach(function (panel) {
+            panel.classList.toggle('is-current', panel === next);
+            panel.inert = panel !== next;
+            if (panel !== next && panel !== outgoing) hide(panel);
+        });
+        next.hidden = false;
+        var geometry = measure(trigger, next);
+        trigger.setAttribute('aria-expanded', 'true');
         viewport.inert = false;
-        viewport.classList.toggle('is-positioning', !wasOpen);
-        position();
-        // Commit the starting size before enabling transitions on first open.
-        void viewport.offsetWidth;
-        viewport.classList.remove('is-positioning');
         viewport.classList.add('is-open');
-        if (!reduced.matches && next.animate) {
-            next.animate([
-                { opacity: 0, transform: 'translate(' + (wasOpen ? direction * 18 : 0) + 'px, ' + (wasOpen ? 0 : 6) + 'px)' },
-                { opacity: 1, transform: 'translate(0, 0)' }
-            ], { duration: 240, easing: 'cubic-bezier(.22, 1, .36, 1)' });
+
+        if (!canAnimate()) {
+            settle(geometry);
+            return;
         }
+        timeline = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        if (!outgoing) {
+            settle(geometry);
+            timeline.fromTo(frame, { y: -6, opacity: .45 }, { y: 0, opacity: 1, duration: .20, clearProps: 'transform,opacity' });
+            return;
+        }
+
+        // Keep the stage size fixed. Only its visible silhouette and position move.
+        timeline.to(viewport, { x: geometry.x, duration: .24 }, 0)
+            .to(frame, { '--preview-right': geometry.right, '--preview-bottom': geometry.bottom, duration: .24 }, 0)
+            .to(outgoing, { x: -direction * 12, opacity: 0, duration: .12, ease: 'power1.out', onComplete: function () { hide(outgoing); } }, 0);
+        // A switch can interrupt the shared frame's first entrance.
+        if (frame.style.opacity || frame.style.transform) {
+            timeline.to(frame, { y: 0, opacity: 1, duration: .16, clearProps: 'transform,opacity' }, 0);
+        }
+        var end = { x: 0, opacity: 1, duration: .20, clearProps: 'transform,opacity' };
+        if (returning) timeline.to(next, end, 0);
+        else timeline.fromTo(next, { x: direction * 14, opacity: .25 }, end, 0);
     }
 
     triggers.forEach(function (trigger) {
@@ -94,13 +150,16 @@
         if (!panel) return;
         trigger.setAttribute('aria-controls', panel.id);
         trigger.setAttribute('aria-expanded', 'false');
-        trigger.addEventListener('pointerenter', function (event) { if (event.pointerType !== 'touch') open(trigger); });
+        trigger.addEventListener('pointerenter', function (event) {
+            if (event.pointerType !== 'touch' && !viewport.contains(document.activeElement)) open(trigger);
+        });
         trigger.addEventListener('focus', function () { if (!restoringFocus) open(trigger); });
         trigger.addEventListener('keydown', function (event) {
             if (!desktop.matches) return;
             if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || (event.key === 'Tab' && !event.shiftKey && active === trigger)) {
                 open(trigger);
-                if (current) { event.preventDefault(); current.querySelector('a').focus(); }
+                var link = current && current.querySelector('a');
+                if (link) { event.preventDefault(); link.focus(); }
             }
         });
     });
@@ -113,14 +172,12 @@
         });
     });
 
-    // The panel is outside the navigation's backdrop-filter.
-    // A short exit delay bridges the 12px gap, allowing diagonal mouse travel.
     nav.addEventListener('pointerenter', cancelClose);
     nav.addEventListener('pointerleave', scheduleClose);
     viewport.addEventListener('pointerenter', cancelClose);
     viewport.addEventListener('pointerleave', scheduleClose);
-    nav.querySelectorAll('a:not([data-nav-preview]), button').forEach(function (item) {
-        item.addEventListener('pointerenter', function () { close(false); });
+    nav.querySelectorAll('a:not([data-nav-preview])').forEach(function (item) {
+        item.addEventListener('pointerenter', function () { if (!viewport.contains(document.activeElement)) close(false); });
         item.addEventListener('focus', function () { close(false); });
     });
     viewport.addEventListener('keydown', function (event) {
@@ -131,8 +188,7 @@
             active.focus();
         } else if (!event.shiftKey && event.target === links[links.length - 1]) {
             event.preventDefault();
-            var next = active.nextElementSibling || document.querySelector('.archive-shortcut') || document.getElementById('theme-toggle');
-            close(false);
+            var next = active.nextElementSibling || document.querySelector('.archive-shortcut');
             if (next) next.focus();
         }
     });
@@ -145,15 +201,8 @@
     document.addEventListener('pointerdown', function (event) {
         if (!nav.contains(event.target) && !viewport.contains(event.target)) close(false);
     });
-    viewport.addEventListener('click', function (event) {
-        if (event.target.closest('a')) close(false);
-    });
-    window.addEventListener('resize', function () { if (desktop.matches) position(); else close(false); });
+    viewport.addEventListener('click', function (event) { if (event.target.closest('a')) close(false); });
+    window.addEventListener('resize', function () { if (desktop.matches) refresh(); else close(false, true); });
     window.addEventListener('blur', function () { close(false); });
-    if (window.ResizeObserver) {
-        var observer = new ResizeObserver(position);
-        panels.forEach(function (panel) { observer.observe(panel); });
-    }
-    viewport.hidden = false;
-    viewport.inert = true;
+    reduced.addEventListener('change', refresh);
 })();
